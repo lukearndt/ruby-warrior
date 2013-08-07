@@ -3,7 +3,7 @@ class Player
   def play_turn(warrior)
     @warrior = warrior
     observe_before_turn
-    ponder_loudly
+    #ponder_loudly
     take_action!
     observe_after_turn
   end
@@ -40,10 +40,14 @@ class Player
       turn_around!
     elsif spot.captive?
       @ahead_melee.captive? ? @warrior.rescue! : @warrior.walk!
+    elsif spot(:backward).captive?
+      turn_around!
     elsif spot.wall?
       turn_around!
+    elsif badly_injured?
+      @warrior.rest!
     else
-     walk_carefully!
+      @warrior.walk!
     end
   end
 
@@ -73,20 +77,6 @@ class Player
     @facing = @facing == :forward ? :behind : :forward
   end
 
-  def walk_carefully!
-    if taking_damage?
-        if healthy_enough?
-          @warrior.walk!
-        else
-          @warrior.walk!(:backward)
-        end
-      elsif full_health?
-        @warrior.walk!
-      else
-        @warrior.rest!
-      end
-  end
-
   def ponder_loudly
     puts "Facing: #{@facing}"
     puts "First thing ahead: #{spot}"
@@ -105,16 +95,12 @@ class Player
     first_thing
   end
 
-  def taking_damage?
-    @last_health > @health
-  end
-
   def full_health?
     @warrior.health == 20
   end
 
-  def healthy_enough?
-    @last_health == 20
+  def badly_injured?
+    @warrior.health < 12
   end
 
 end
