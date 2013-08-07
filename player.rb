@@ -11,11 +11,12 @@ class Player
   def initialize
     @last_health ||= 20
     @cleared_behind = false
+    @facing = :forward
   end
 
   def observe_before_turn
     @health = @warrior.health
-    @ahead = @warrior.feel
+    @ahead_melee = @warrior.feel
     @behind = @warrior.feel(:backward)
   end
 
@@ -24,18 +25,20 @@ class Player
   end
 
   def take_action!
-    if @ahead.wall?
+    if first_thing_ahead.wall?
       turn_around!
-    elsif @ahead.empty?
-      walk_carefully!
+    elsif first_thing_ahead.enemy?
+      @ahead_melee.enemy? ? @warrior.attack! : @warrior.shoot!
+    elsif first_thing_ahead.captive?
+      @ahead_melee.captive? ? @warrior.rescue! : @warrior.walk!
     else
-      @warrior.attack! if @ahead.enemy?
-      @warrior.rescue! if @ahead.captive?
+      @warrior.walk!
     end
   end
 
   def turn_around!
     @warrior.pivot!
+    @facing = @facing == :forward ? :behind : :forward
   end
 
   def walk_carefully!
@@ -53,9 +56,21 @@ class Player
   end
 
   def ponder_loudly
-    puts "Ahead: #{@ahead}"
+    puts "Facing: #{@facing}"
+    puts "First thing ahead: #{first_thing_ahead}"
+    puts "Immediately ahead: #{@ahead_melee}"
     puts "Behind: #{@warrior.feel(:backward)}"
     puts "Taking damage? #{taking_damage?}"
+  end
+
+  def first_thing_ahead
+    first_thing = @ahead_melee
+    @warrior.look.each do |space|
+      if first_thing.empty?
+        first_thing = space unless first_thing.stairs?
+      end
+    end
+    first_thing
   end
 
   def taking_damage?
