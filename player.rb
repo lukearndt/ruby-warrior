@@ -12,6 +12,13 @@ class Player
     @last_health ||= 20
     @cleared_behind = false
     @facing = :forward
+    @enemy_danger =
+      {
+        "Wizard" => 11,
+        "Archer" => 3,
+        "Sludge" => 3 / 12,
+        "Thick Sludge" => 3 / 24,
+      }
   end
 
   def observe_before_turn
@@ -25,15 +32,40 @@ class Player
   end
 
   def take_action!
-    if first_thing_ahead.wall?
+    if spot(:forward).enemy? && spot(:backward).enemy?
+      attack_priority!
+    elsif spot.enemy?
+      fight!
+    elsif spot(:backward).enemy?
       turn_around!
-    elsif first_thing_ahead.enemy?
-      @ahead_melee.enemy? ? @warrior.attack! : @warrior.shoot!
-    elsif first_thing_ahead.captive?
+    elsif spot.captive?
       @ahead_melee.captive? ? @warrior.rescue! : @warrior.walk!
+    elsif spot.wall?
+      turn_around!
     else
-      @warrior.walk!
+     walk_carefully!
     end
+  end
+
+
+  def attack_priority!
+    if most_dangerous_direction(:forward, :backward) == :forward
+      fight!
+    else
+      if spot(:backward).to_s == "w" && "a"
+        @warrior.shoot!(:backward)
+      else
+        turn_around!
+      end
+    end
+  end
+
+  def most_dangerous_direction(first, second)
+    @enemy_danger[spot(first).to_s] > @enemy_danger[spot(second).to_s] ? first : second
+  end
+
+  def fight!
+    @ahead_melee.enemy? ? @warrior.attack! : @warrior.shoot!
   end
 
   def turn_around!
@@ -57,15 +89,15 @@ class Player
 
   def ponder_loudly
     puts "Facing: #{@facing}"
-    puts "First thing ahead: #{first_thing_ahead}"
+    puts "First thing ahead: #{spot}"
     puts "Immediately ahead: #{@ahead_melee}"
     puts "Behind: #{@warrior.feel(:backward)}"
     puts "Taking damage? #{taking_damage?}"
   end
 
-  def first_thing_ahead
-    first_thing = @ahead_melee
-    @warrior.look.each do |space|
+  def spot(direction = :forward)
+    first_thing = @warrior.feel(direction)
+    @warrior.look(direction).each do |space|
       if first_thing.empty?
         first_thing = space unless first_thing.stairs?
       end
@@ -84,6 +116,5 @@ class Player
   def healthy_enough?
     @last_health == 20
   end
-
 
 end
