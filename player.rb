@@ -2,7 +2,6 @@ class Player
 
   def play_turn(warrior)
     @warrior = warrior
-    #ponder_loudly
     take_action!
   end
 
@@ -18,17 +17,17 @@ class Player
     @health_needed_for_melee =
     {
       "Wizard" => 12,
-      "Archer" => 15,
+      "Archer" => 10,
       "Sludge" => 10,
       "Thick Sludge" => 16,
       "Captive" => 0
     }
     @health_needed_for_ranged =
     {
-      "Wizard" => 1,
+      "Wizard" => 0,
       "Archer" => 7,
-      "Sludge" => 1,
-      "Thick Sludge" => 1,
+      "Sludge" => 0,
+      "Thick Sludge" => 0,
       "Captive" => 0
     }
     @just_fled_from_archer = false
@@ -102,10 +101,11 @@ class Player
 
   def engage!
     if @warrior.feel.enemy?
-      puts "Fighting #{spotted_enemy_type} in melee."
       @warrior.attack!
     elsif ranged_enemy?
-      if healthy_enough_for_melee?
+      if spotted_enemy_type == "Wizard"
+        skirmish!
+      elsif healthy_enough_for_melee?
         charge!
       elsif healthy_enough_for_ranged?
         skirmish!
@@ -137,13 +137,11 @@ class Player
   end
 
   def skirmish!
-    puts "Skirmishing #{spotted_enemy_type}."
     @warrior.feel.enemy? ? @warrior.attack! : @warrior.shoot!
     @just_fled_from_archer = false
   end
 
   def charge!
-    puts "Charging #{spotted_enemy_type}!"
     @warrior.feel.enemy? ? @warrior.attack! : @warrior.walk!
     @just_fled_from_archer = false
   end
@@ -151,14 +149,6 @@ class Player
   def turn_around!
     @warrior.pivot!
     @facing = @facing == :forward ? :behind : :forward
-  end
-
-  def ponder_loudly
-    puts "Facing: #{@facing}"
-    puts "First thing ahead: #{spot}"
-    puts "Immediately ahead: #{@warrior.feel}"
-    puts "Behind: #{@warrior.feel(:backward)}"
-    puts "Taking damage? #{taking_damage?}"
   end
 
   def spot(direction = :forward)
@@ -184,7 +174,11 @@ class Player
   end
 
   def healthy_enough_for_ranged?(direction = :forward)
-    @warrior.health >= spot.unit.health + health_buffer("Archer") + health_buffer("Wizard")
+    if @health_needed_for_ranged[spotted_enemy_type] > 0
+      @warrior.health >= spot.unit.health + health_buffer("Archer") + health_buffer("Wizard")
+    else
+      @warrior.health >= health_buffer("Archer") + health_buffer("Wizard")
+    end
   end
 
   def health_buffer(enemy_type)
