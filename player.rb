@@ -18,7 +18,7 @@ class Player
     @health_needed_for_melee =
     {
       "Wizard" => 12,
-      "Archer" => 7,
+      "Archer" => 15,
       "Sludge" => 10,
       "Thick Sludge" => 16,
       "Captive" => 0
@@ -36,17 +36,19 @@ class Player
 
   def take_action!
     if spot(:forward).enemy? && spot(:backward).enemy?
-      attack_most_dangerous!
-    elsif @just_fled_from_archer && (@warrior.health >= @health_needed_for_melee["Archer"])
+      attack_most_dangerous_enemy!
+    elsif @just_fled_from_archer && (@warrior.health <= @health_needed_for_ranged["Archer"])
       @warrior.rest!
-    elsif spot(:backward).enemy?
-      engage_behind!
+    elsif @warrior.feel(:backward).captive?
+      @warrior.rescue!(:backward)
+    elsif spot(:backward).captive?
+      @warrior.walk!(:backward)
     elsif spot.captive?
       free_captive_carefully!
+    elsif spot(:backward).enemy?
+      engage_behind!
     elsif spot.enemy?
       engage!
-    elsif spot(:backward).captive?
-      turn_around!
     elsif spot.wall?
       turn_around!
     else
@@ -54,7 +56,7 @@ class Player
     end
   end
 
-  def attack_most_dangerous!
+  def attack_most_dangerous_enemy!
     if most_dangerous_direction(:forward, :backward) == :forward
       skirmish!
     else
@@ -99,23 +101,27 @@ class Player
   end
 
   def engage!
-    if ranged_enemy?
+    if @warrior.feel.enemy?
+      puts "Fighting #{spotted_enemy_type} in melee."
+      @warrior.attack!
+    elsif ranged_enemy?
       if healthy_enough_for_melee?
         charge!
       elsif healthy_enough_for_ranged?
         skirmish!
+      else
+        @just_fled_from_archer = true
+        @warrior.walk!(:backward)
       end
     elsif healthy_enough_for_melee?
       charge!
-    elsif @warrior.feel.enemy?
-      @warrior.walk!(:backward)
-    elsif ranged_enemy?
-      @warrior.walk!(:backward)
-      @just_fled_from_archer = true
     elsif healthy_enough_for_melee_with_one_rest?
       @warrior.rest!
+    elsif healthy_enough_for_ranged?
+      skirmish!
     else
-      @warrior.shoot!
+      @just_fled_from_archer = true
+      @warrior.walk!(:backward)
     end
   end
 
@@ -131,12 +137,15 @@ class Player
   end
 
   def skirmish!
+    puts "Skirmishing #{spotted_enemy_type}."
     @warrior.feel.enemy? ? @warrior.attack! : @warrior.shoot!
     @just_fled_from_archer = false
   end
 
   def charge!
+    puts "Charging #{spotted_enemy_type}!"
     @warrior.feel.enemy? ? @warrior.attack! : @warrior.walk!
+    @just_fled_from_archer = false
   end
 
   def turn_around!
@@ -175,7 +184,7 @@ class Player
   end
 
   def healthy_enough_for_ranged?(direction = :forward)
-    @warrior.health >= @health_needed_for_ranged[spotted_enemy_type] + health_buffer("Archer") + health_buffer("Wizard")
+    @warrior.health >= spot.unit.health + health_buffer("Archer") + health_buffer("Wizard")
   end
 
   def health_buffer(enemy_type)
